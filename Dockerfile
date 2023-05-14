@@ -10,7 +10,7 @@ RUN mkdir /build
 RUN mv bird /build
 RUN mv birdc /build
 
-FROM gcr.io/distroless/static:debug
+FROM scratch AS binaries
 COPY --from=builder /build/bird /usr/local/bin/_bird
 COPY --from=builder /build/birdc /usr/local/bin/_birdc
 COPY --from=builder /usr/bin/iptables /usr/bin/iptables
@@ -25,25 +25,25 @@ COPY --from=builder /usr/lib/xtables/* /usr/lib/xtables/
 COPY --from=builder /usr/lib/libc.so.6 /usr/lib/libc.so.6
 COPY --from=builder /usr/lib/ld-linux-x86-64.so.2 /usr/lib/ld-linux-x86-64.so.2
 
-RUN ["/busybox/sh", "-c", "mkdir -p /usr/local/bird"]
-RUN ["/busybox/sh", "-c", "mkdir -p /usr/local/var/run"]
-RUN ["/busybox/sh", "-c", "mkdir -p /etc/iptables"]
+FROM gcr.io/distroless/static:debug
+COPY --from=binaries / /
 
-RUN ["/busybox/sh", "-c", "echo '#! /busybox/sh' >> /usr/local/bin/bird"]
-RUN ["/busybox/sh", "-c", "echo '/usr/lib/ld-linux-x86-64.so.2 /usr/local/bin/_bird $@' >> /usr/local/bin/bird"]
-RUN ["/busybox/sh", "-c", "chmod +x /usr/local/bin/bird"]
+RUN ["/busybox/sh", "-c", "ln -s /busybox/sh /bin/sh"]
+RUN mkdir -p /usr/local/bird \
+ && mkdir -p /usr/local/var/run \
+ && mkdir -p /etc/iptables \
+ && (echo '#! /busybox/sh' >> /usr/local/bin/bird) \
+ && (echo '/usr/lib/ld-linux-x86-64.so.2 /usr/local/bin/_bird $@' >> /usr/local/bin/bird) \
+ && chmod +x /usr/local/bin/bird \
+ && (echo '#! /busybox/sh' >> /usr/local/bin/birdc) \
+ && (echo '/usr/lib/ld-linux-x86-64.so.2 /usr/local/bin/_birdc $@' >> /usr/local/bin/birdc) \
+ && chmod +x /usr/local/bin/birdc \
+ && (echo '#! /busybox/sh' >> /usr/local/bin/iptables) \
+ && (echo '/usr/lib/ld-linux-x86-64.so.2 /usr/bin/iptables $@' >> /usr/local/bin/iptables) \
+ && chmod +x /usr/local/bin/iptables \
+ && (echo '#! /busybox/sh' >> /usr/local/bin/iptables-save) \
+ && (echo '/usr/lib/ld-linux-x86-64.so.2 /usr/bin/iptables-save $@' >> /usr/local/bin/iptables-save) \
+ && chmod +x /usr/local/bin/iptables-save
 
-RUN ["/busybox/sh", "-c", "echo '#! /busybox/sh' >> /usr/local/bin/birdc"]
-RUN ["/busybox/sh", "-c", "echo '/usr/lib/ld-linux-x86-64.so.2 /usr/local/bin/_birdc $@' >> /usr/local/bin/birdc"]
-RUN ["/busybox/sh", "-c", "chmod +x /usr/local/bin/birdc"]
-
-RUN ["/busybox/sh", "-c", "echo '#! /busybox/sh' >> /usr/local/bin/iptables"]
-RUN ["/busybox/sh", "-c", "echo '/usr/lib/ld-linux-x86-64.so.2 /usr/bin/iptables $@' >> /usr/local/bin/iptables"]
-RUN ["/busybox/sh", "-c", "chmod +x /usr/local/bin/iptables"]
-
-RUN ["/busybox/sh", "-c", "echo '#! /busybox/sh' >> /usr/local/bin/iptables-save"]
-RUN ["/busybox/sh", "-c", "echo '/usr/lib/ld-linux-x86-64.so.2 /usr/bin/iptables-save $@' >> /usr/local/bin/iptables-save"]
-RUN ["/busybox/sh", "-c", "chmod +x /usr/local/bin/iptables-save"]
-
-ENTRYPOINT ["/busybox/sh"]
+ENTRYPOINT ["/busybox/sh", "-c"]
 CMD ["/usr/local/bin/bird", "-d"]
